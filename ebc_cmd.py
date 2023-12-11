@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 
 from ebc import EBC, ChargeMode
+import time
 
 def disconnect(e, args):
    e.disconnect()
@@ -12,6 +13,9 @@ def ccv(e, args):
    e.charge(ChargeMode.ccv, u=args.u, i=args.i, istop=args.cut)
    e.wait()
 
+def status(e, args):
+   time.sleep(10)
+   e.disconnect()
 
 if __name__ == '__main__':
    from argparse import ArgumentParser
@@ -28,6 +32,8 @@ if __name__ == '__main__':
    parser_disconnect.set_defaults(func=disconnect)
    parser_stop = subparsers.add_parser('stop', help="Stop")
    parser_stop.set_defaults(func=stop)
+   parser_status = subparsers.add_parser('status', help="Status")
+   parser_status.set_defaults(func=status)
    args = arg.parse_args()
    e = EBC(args.port)
    e.connect()

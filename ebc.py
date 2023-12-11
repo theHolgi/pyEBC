@@ -1,4 +1,5 @@
 # This is a sample Python script.
+import re
 import time
 from datetime import datetime
 from types import SimpleNamespace
@@ -23,54 +24,14 @@ class ChargeMode(Enum):
 class Stdoutwriter:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
-        self.messages = """fa 02 00 00 10 8e 00 14 00 00 02 14 01 a0 00 64 09 52 f8 
-fa 02 00 00 10 8e 00 14 00 00 02 14 01 a0 00 64 09 52 f8 
-fa 0c 00 00 10 8e 00 00 00 00 02 14 01 a0 00 96 09 ba f8 
-fa 0c 00 8f 10 96 00 00 00 00 02 14 01 a0 00 96 09 2d f8 
-fa 0c 00 c3 10 a0 00 01 00 00 02 14 01 a0 00 96 09 56 f8 
-fa 0c 00 c8 10 a0 00 02 00 00 02 14 01 a0 00 96 09 5e f8 
-fa 0c 00 cc 10 a0 00 03 00 00 02 14 01 a0 00 96 09 5b f8 
-fa 0c 00 ce 10 a0 00 05 00 00 02 14 01 a0 00 96 09 5f f8 
-fa 0c 00 d1 10 a0 00 06 00 00 02 14 01 a0 00 96 09 43 f8 
-fa 0c 00 d2 10 a0 00 07 00 00 02 14 01 a0 00 96 09 41 f8 
-fa 0c 00 d4 10 a0 00 08 00 00 02 14 01 a0 00 96 09 48 f8 
-fa 0c 00 d6 10 a0 00 09 00 00 02 14 01 a0 00 96 09 4b f8 
-fa 0c 00 d7 10 a0 00 0a 00 00 02 14 01 a0 00 96 09 49 f8 
-fa 0c 00 d8 10 a0 00 0c 00 00 02 14 01 a0 00 96 09 40 f8 
-fa 0c 00 d9 10 a0 00 0d 00 00 02 14 01 a0 00 96 09 40 f8 
-fa 0c 00 da 10 a0 00 0e 00 00 02 14 01 a0 00 96 09 40 f8 
-fa 0c 00 db 10 a0 00 0f 00 00 02 14 01 a0 00 96 09 40 f8 
-fa 0c 00 dc 10 a0 00 10 00 00 02 14 01 a0 00 96 09 58 f8 
-fa 0c 00 dd 10 a0 00 12 00 00 02 14 01 a0 00 96 09 5b f8 
-fa 0c 00 de 10 a0 00 13 00 00 02 14 01 a0 00 96 09 59 f8 
-fa 0c 00 df 10 a0 00 14 00 00 02 14 01 a0 00 96 09 5f f8 
-fa 0c 00 df 10 a0 00 15 00 00 02 14 01 a0 00 96 09 5e f8 
-fa 0c 00 df 10 a0 00 17 00 00 02 14 01 a0 00 96 09 5c f8 
-fa 0c 00 e0 10 a0 00 18 00 00 02 14 01 a0 00 96 09 6c f8 
-fa 0c 00 e0 10 a0 00 19 00 00 02 14 01 a0 00 96 09 6d f8 
-fa 0c 00 e1 10 a0 00 1a 00 00 02 14 01 a0 00 96 09 6f f8 
-fa 0c 00 e1 10 a0 00 1c 00 00 02 14 01 a0 00 96 09 69 f8 
-fa 0c 00 e1 10 a0 00 1d 00 00 02 14 01 a0 00 96 09 68 f8 
-fa 0c 00 e1 10 a0 00 1e 00 00 02 14 01 a0 00 96 09 6b f8 
-fa 0c 00 e1 10 a0 00 1f 00 00 02 14 01 a0 00 96 09 6a f8 
-fa 0c 00 e1 10 a0 00 21 00 00 02 14 01 a0 00 96 09 54 f8 
-fa 0c 00 e1 10 a0 00 22 00 00 02 14 01 a0 00 96 09 57 f8 
-fa 0c 00 e1 10 a0 00 23 00 00 02 14 01 a0 00 96 09 56 f8 
-fa 0c 00 e1 10 a0 00 24 00 00 02 14 01 a0 00 96 09 51 f8 
-fa 0c 00 e1 10 a0 00 26 00 00 02 14 01 a0 00 96 09 53 f8 
-fa 0c 00 e1 10 a0 00 27 00 00 02 14 01 a0 00 96 09 52 f8 
-fa 0c 00 e1 10 a0 00 28 00 00 02 14 01 a0 00 96 09 5d f8 
-fa 0c 00 e1 10 a0 00 29 00 00 02 14 01 a0 00 96 09 5c f8 
-fa 0c 00 e1 10 a0 00 2b 00 00 02 14 01 a0 00 96 09 5e f8 
-fa 0c 00 e1 10 a0 00 2c 00 00 02 14 01 a0 00 96 09 59 f8 
-fa 0c 00 e1 10 a0 00 2d 00 00 02 14 01 a0 00 96 09 58 f8 
-fa 0c 00 e1 10 a0 00 2e 00 00 02 14 01 a0 00 96 09 5b f8 
-fa 0c 00 e1 10 a0 00 30 00 00 02 14 01 a0 00 96 09 45 f8 
-fa 0c 00 e0 10 a0 00 31 00 00 02 14 01 a0 00 96 09 45 f8 
-fa 16 00 df 10 a0 00 32 00 00 02 14 01 a0 00 96 09 77 f8 
-fa 02 00 df 10 a0 00 32 00 00 02 14 01 a0 00 96 09 77 f8 
-""".split('\n')
+
+        self.messages =[ ]
+        with open("testdata.txt") as f:
+            for line in f.readlines():
+                if m := re.match(r"([\d:]+)\s+IRP_MJ_READ\s+UP\s+STATUS_SUCCESS\s+(.+)", line):
+                    self.messages.append(m.groups())
         self.dummy_in = b''
+        self.timestamp = datetime.strptime(self.messages[0][0], "%X")
 
     def write(self, data: bytes) -> None:
         self.logger.info(" ".join('{:02x}'.format(b) for b in data))
@@ -81,31 +42,40 @@ fa 02 00 df 10 a0 00 32 00 00 02 14 01 a0 00 96 09 77 f8
                 time.sleep(10)
                 return b''
             else:
-                msg = self.messages.pop(0)
+                ts, msg = self.messages.pop(0)
                 self.dummy_in = bytes(int(c, 16) for c in msg.split())
+                self.timestamp = datetime.strptime(ts, "%X")
         time.sleep(0.02)
         reply = self.dummy_in[:length]
         self.dummy_in = self.dummy_in[length:]
         return reply
 
+    def gettimestamp(self) -> datetime:
+        return self.timestamp
 
 class EBC:
+    models = {5: "EBC-A05", 6: "EBC-A10H", 9: "EBC-A20"}
+
     def __init__(self, tty: str = '/dev/ttyACM0'):
         if tty == '-':
             self.io = Stdoutwriter()
+            self.gettimestamp = self.io.gettimestamp
         else:
-            self.io = serial.Serial(port=tty, baudrate=9600)
+            self.io = serial.Serial(port=tty, baudrate=9600, parity=serial.PARITY_EVEN, rtscts=True)
+            self.gettimestamp = datetime.now
         self.reader = Thread(target=self.read_func, daemon=True)
         self.curr = SimpleNamespace()
         self.done = True
+        self.last_rx = None
 
     def _interpret(self, d: bytes) -> bool:
         if len(d) < 17: return False
+        now = self.gettimestamp()
         id = int(d[0])
         # First part of message is always the same
-        self.curr = SimpleNamespace()
         self.curr.i = self._d2ti(d[1:3])     # mA
         self.curr.u = self._d2i(d[3:5])      # mV
+        self.curr.p = self.curr.i * self.curr.u / 1000
         if id < 10:
             self.curr.state = 'idle'
         elif id < 20:
@@ -128,23 +98,30 @@ class EBC:
             self.curr.p_s = self._d2i(d[9:11])     # soll P (W)
         self.curr.u_s = self._d2ti(d[11:13]) # soll mV
         self.curr.x2 = self._d2i(d[13:15])   # ?
-        self.curr.t = self._d2i(d[15:17])    # T?
+        self.curr.model = self.models[int(d[15])]
 
+        if self.last_rx is None:
+            self.curr.qw = 0
+        else:
+            dT = now - self.last_rx
+            dQ = self.curr.p * dT.total_seconds() / 3600
+            self.curr.qw += dQ
+        self.last_rx = now
         self.dumpState()
         return True
 
     def dumpState(self) -> None:
         p = self.curr.i * self.curr.u / 1000000.0
-        d = "%s (%s) %imAh / %imWh  %imV / %imA %.2fW" % \
-          (self.curr.mode, self.curr.state, self.curr.q,  self.curr.x1, self.curr.u, self.curr.i, p)
+        d = f"{self.curr.model} {self.curr.mode if self.curr.state == 'active' else 'idle'} {self.curr.q}mAh / {self.curr.qw:.0f}mWh  {self.curr.u}mV / {self.curr.i}mA {p:.2f}W"
         d += " --> "
         if hasattr(self.curr, 'i_s'):
             d += " %imA" % self.curr.i_s
-        d += " %imV %i %i" % (self.curr.u_s, self.curr.x1, self.curr.t)
+        d += " %imV %i" % (self.curr.u_s, self.curr.x1)
         logging.debug(d)
 
     def read_func(self):
         logger = logging.getLogger('RX')
+        self.last_rx = None
         while True:
             # Wait for start
             while True:
@@ -181,6 +158,8 @@ class EBC:
         d = list(data)
         crc = reduce(lambda a, b: a ^ b, d)
         datagram = bytes([250] + d + [crc, 248])
+        logger = logging.getLogger('TX')
+        logger.debug(" ".join('{:02x}'.format(b) for b in datagram))
         self.io.write(datagram)
 
     @staticmethod
@@ -201,7 +180,7 @@ class EBC:
     def charge(self, mode: ChargeMode, u: int, i: int, istop: int) -> None:
         # fa 21 02 14 01 78 00 32 7c f8
         self.done = False
-        self.begin = datetime.now()
+        self.begin = self.gettimestamp()
         logging.debug("Start at: " + self.begin.strftime('%X'))
         if mode == ChargeMode.ccv:
             data = [33] + self._i2d(i) + self._i2d(u) + self._i2d(istop)
@@ -209,12 +188,12 @@ class EBC:
 
     def wait(self):
         while True:
-            time.sleep(1)
+            time.sleep(5)
             if self.done:
                 break
-        end = datetime.now()
+        end = self.gettimestamp()
         logging.debug("Start at: " + end.strftime('%X'))
-        logging.debug("Duration: " + str(end-self.begin))
+        logging.debug("Duration: " + str(end - self.begin))
 
 
 if __name__ == '__main__':
