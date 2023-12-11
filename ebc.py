@@ -67,6 +67,7 @@ class EBC:
         self.curr = SimpleNamespace()
         self.done = True
         self.last_rx = None
+        self.logger = logging.getLogger(self.__class__.__name__)
 
     def _interpret(self, d: bytes) -> bool:
         if len(d) < 17: return False
@@ -82,6 +83,7 @@ class EBC:
             self.curr.state = 'active'
         else:
             self.curr.state = 'done'
+            self.logger.info("DONE!")
             self.done = True
         if id in (2, 12, 22):
             self.curr.mode = ChargeMode.ccv
@@ -152,7 +154,7 @@ class EBC:
 
     def measure_r(self, i:int) -> None:
         # fa 05 00 00 00 00 00 00 05 f8
-        self.send([9] + self._i2d(i//10) + [0,0,0,0])
+        self.send([9] + self._i2td(i) + [0,0,0,0])
 
     def send(self, data: Iterable[int]) -> None:
         d = list(data)
@@ -165,9 +167,13 @@ class EBC:
     @staticmethod
     def _i2d(n: int) -> List[int]:
         """Convert value to data"""
-        n = n//10
+        n = n
         return [n // 240, n % 240]
 
+    @staticmethod
+    def _i2td(n: int) -> List[int]:
+        return EBC._i2d(n//10)
+        
     @staticmethod
     def _d2i(d: Union[Tuple[int, int], bytes]) -> int:
         """Convert tuple to value"""
@@ -183,7 +189,7 @@ class EBC:
         self.begin = self.gettimestamp()
         logging.debug("Start at: " + self.begin.strftime('%X'))
         if mode == ChargeMode.ccv:
-            data = [33] + self._i2d(i) + self._i2d(u) + self._i2d(istop)
+            data = [33] + self._i2d(i) + self._i2td(u) + self._i2td(istop)
             self.send(data)
 
     def wait(self):

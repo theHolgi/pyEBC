@@ -56,7 +56,7 @@ class MyTestCase(unittest.TestCase):
       e = EBC()
       e._interpret(b'\x0c\x02\x14\x0e\x60\x00\x0a\x00\x00\x02\x14\x01\x78\x00\x32\x09\xc0')
       self.assertEqual(e.curr.mode, ChargeMode.ccv)
-      self.assertEqual(e.curr.state, 'done')
+      self.assertEqual(e.curr.state, 'active')
       self.assertEqual(e.curr.i, 5000)
       self.assertEqual(e.curr.u, 3456)
       self.assertEqual(e.curr.i_s, 5000)
