@@ -21,11 +21,11 @@ class MyTestCase(unittest.TestCase):
       self.data = data
 
    def test_convert(self):
-      self.assertEqual(EBC._i2d(10000),[4, 40])
-      self.assertEqual(EBC._i2d(3700), [1, 130])
+      self.assertEqual([15, 100], EBC._i2d(3700))
+      self.assertEqual([4, 40], EBC._i2td(10000))
 
-      self.assertEqual(EBC._d2i((5, 34)), 1234)
-      self.assertEqual(EBC._d2ti((0, 50)), 500)
+      self.assertEqual(1234, EBC._d2i((5, 34)))
+      self.assertEqual(500, EBC._d2ti((0, 50)))
 
    def test_connect(self):
       e = EBC()
@@ -44,13 +44,27 @@ class MyTestCase(unittest.TestCase):
 
    def test_measure_r(self):
       e = EBC()
-      e.measure_r(2000)
-      e.io.write.assert_called_once_with(self.framed(b'\x09' + bytes(EBC._i2d(200)) + b'\0\0\0\0'))
+      i = 2000
+      e.measure_r(i)
+      e.io.write.assert_called_once_with(self.framed(b'\x09' + bytes(EBC._i2td(i)) + b'\0\0\0\0'))
 
    def test_start_ccv(self):
       e = EBC()
-      e.charge(ChargeMode.ccv, u=5000, i=10000, istop=1000)
-      e.io.write.assert_called_once_with(self.framed(b'\x21\x04\x28\x02\x14\0\x64'))
+      u, i, i_s = 4000, 10000, 1000
+      e.charge(ChargeMode.ccv, u=u, i=i, istop=1000)
+      e.io.write.assert_called_once_with(self.framed(b'\x21' + bytes(EBC._i2d(i)) + bytes(EBC._i2td(u)) + bytes(EBC._i2td(i_s))))
+
+   def test_start_dcp(self):
+      e = EBC()
+      u, p = 3000, 400
+      e.charge(ChargeMode.dcp, u=u, p=p)
+      e.io.write.assert_called_once_with(self.framed(b'\x11' + bytes(EBC._i2d(p)) + bytes(EBC._i2td(u)) + b'\0\0'))
+
+   def test_start_dcc(self):
+      e = EBC()
+      u, i = 3000, 20000
+      e.charge(ChargeMode.dcc, u=u, i=i)
+      e.io.write.assert_called_once_with(self.framed(b'\1' + bytes(EBC._i2td(i)) + bytes(EBC._i2td(u)) + b'\0\0'))
 
    def test_status_ccv(self):
       e = EBC()

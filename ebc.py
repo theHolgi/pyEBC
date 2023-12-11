@@ -183,13 +183,27 @@ class EBC:
     def _d2ti(d) -> int:
         return 10 * EBC._d2i(d)
 
-    def charge(self, mode: ChargeMode, u: int, i: int, istop: int) -> None:
+    def charge(self, mode: ChargeMode, u: int, i: int = None, istop: int = None, p: int = None) -> None:
         # fa 21 02 14 01 78 00 32 7c f8
         self.done = False
         self.begin = self.gettimestamp()
         logging.debug("Start at: " + self.begin.strftime('%X'))
         if mode == ChargeMode.ccv:
+            if i is None or u is None or istop is None:
+                raise ValueError("Required parameters for CCV charge; U, I, ISTOP")
             data = [33] + self._i2d(i) + self._i2td(u) + self._i2td(istop)
+            self.send(data)
+        if mode == ChargeMode.dcp:
+            if p is None and i is not None:
+                p = u * i // 1000
+            if u is None or p is None:
+                raise ValueError("Required parameters for CP discharge; U, P or I")
+            data = [17] + self._i2d(p) + self._i2td(u) + self._i2d(0)
+            self.send(data)
+        if mode == ChargeMode.dcc:
+            if u is None or i is None:
+                raise ValueError("Required parameters for CC discharge; U, I")
+            data = [1] + self._i2td(i) + self._i2td(u) + self._i2d(0)
             self.send(data)
 
     def wait(self):
