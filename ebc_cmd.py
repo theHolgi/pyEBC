@@ -17,6 +17,11 @@ def status(e, args):
    time.sleep(10)
    e.disconnect()
 
+def meas_r(e, args):
+   r = e.measure_r(args.i)
+   print(f"R is {r:.1f}")
+
+
 if __name__ == '__main__':
    from argparse import ArgumentParser
    arg = ArgumentParser(prog='EBC')
@@ -34,6 +39,9 @@ if __name__ == '__main__':
    parser_stop.set_defaults(func=stop)
    parser_status = subparsers.add_parser('status', help="Status")
    parser_status.set_defaults(func=status)
+   parser_measure_r = subparsers.add_parser('r', help="Meausre R")
+   parser_measure_r.add_argument('i', help="Measurement current (mA)", type=int)
+   parser_measure_r.set_defaults(func=meas_r)
    args = arg.parse_args()
    e = EBC(args.port)
    e.connect()

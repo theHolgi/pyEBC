@@ -8,7 +8,7 @@ from typing import List, Tuple, Iterable, Union
 import serial
 from functools import reduce
 from enum import Enum
-from threading import Thread
+from threading import Thread, Event
 import logging
 
 logging.basicConfig(level=logging.DEBUG)
@@ -25,7 +25,7 @@ class Stdoutwriter:
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)
 
-        self.messages =[ ]
+        self.messages = [ ]
         with open("testdata.txt") as f:
             for line in f.readlines():
                 if m := re.match(r"([\d:]+)\s+IRP_MJ_READ\s+UP\s+STATUS_SUCCESS\s+(.+)", line):
@@ -53,6 +53,29 @@ class Stdoutwriter:
     def gettimestamp(self) -> datetime:
         return self.timestamp
 
+
+class EBC_Keepalive:
+    def __init__(self, send_func):
+        self.send_func = send_func
+        self.stop = Event()
+        self.keepalivetask = Thread(target=self.keepalive_func, daemon=True)
+        self.hbcnt = 0
+
+    def start(self) -> None:
+        self.hbcnt = 0
+        self.stop.clear()
+
+    def stop(self) -> None:
+        self.stop.set()
+
+    def keepalive_func(self):
+        while True:
+            if not self.stop.is_set():
+                self.send_func([10] + EBC._i2d(self.hbcnt) + [0, 0, 0, 0])
+                self.hbcnt += 1
+            time.sleep(60)
+
+
 class EBC:
     models = {5: "EBC-A05", 6: "EBC-A10H", 9: "EBC-A20"}
 
@@ -63,7 +86,8 @@ class EBC:
         else:
             self.io = serial.Serial(port=tty, baudrate=9600, parity=serial.PARITY_EVEN, rtscts=True)
             self.gettimestamp = datetime.now
-        self.reader = Thread(target=self.read_func, daemon=True)
+        self.keepalive = EBC_Keepalive(self.send)
+        self.readertask = Thread(target=self.read_func, daemon=True)
         self.curr = SimpleNamespace()
         self.done = True
         self.last_rx = None
@@ -141,7 +165,7 @@ class EBC:
     def connect(self) -> None:
         # fa 05 00 00 00 00 00 00 05 f8
         self.send((5,0,0,0,0,0,0))
-        self.reader.start()
+        self.readertask.start()
 
     def disconnect(self) -> None:
         # fa 05 00 00 00 00 00 00 05 f8
@@ -149,12 +173,15 @@ class EBC:
 
     def stop(self) -> None:
         # fa 05 00 00 00 00 00 00 05 f8
+        self.keepalive.stop()
         self.send((2,0,0,0,0,0,0))
         self.done = True
 
-    def measure_r(self, i:int) -> None:
-        # fa 05 00 00 00 00 00 00 05 f8
+    def measure_r(self, i:int) -> int:
+        # fa 09 00 64 00 00 00 00 6d f8
         self.send([9] + self._i2td(i) + [0,0,0,0])
+        self.wait()
+        return self.curr.q / i
 
     def send(self, data: Iterable[int]) -> None:
         d = list(data)
@@ -205,6 +232,7 @@ class EBC:
                 raise ValueError("Required parameters for CC discharge; U, I")
             data = [1] + self._i2td(i) + self._i2td(u) + self._i2d(0)
             self.send(data)
+        self.keepalive.start()
 
     def wait(self):
         while True:
