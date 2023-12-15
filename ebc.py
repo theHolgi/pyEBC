@@ -57,20 +57,20 @@ class Stdoutwriter:
 class EBC_Keepalive:
     def __init__(self, send_func):
         self.send_func = send_func
-        self.stop = Event()
+        self.pause = Event()
         self.keepalivetask = Thread(target=self.keepalive_func, daemon=True)
         self.hbcnt = 0
 
     def start(self) -> None:
         self.hbcnt = 0
-        self.stop.clear()
+        self.pause.clear()
 
     def stop(self) -> None:
-        self.stop.set()
+        self.pause.set()
 
     def keepalive_func(self):
         while True:
-            if not self.stop.is_set():
+            if not self.pause.is_set():
                 self.send_func([10] + EBC._i2d(self.hbcnt) + [0, 0, 0, 0])
                 self.hbcnt += 1
             time.sleep(60)
@@ -180,6 +180,7 @@ class EBC:
 
     def measure_r(self, i:int) -> int:
         # fa 09 00 64 00 00 00 00 6d f8
+        self.begin = self.gettimestamp()
         self.send([9] + self._i2td(i) + [0,0,0,0])
         self.wait()
         return self.curr.q / i
