@@ -3,7 +3,7 @@ import re
 import time
 from datetime import datetime
 from types import SimpleNamespace
-from typing import List, Tuple, Iterable, Union
+from typing import List, Tuple, Iterable, Union, Callable
 
 import serial
 from functools import reduce
@@ -92,6 +92,7 @@ class EBC:
         self.done = True
         self.last_rx = None
         self.logger = logging.getLogger(self.__class__.__name__)
+        self.condition = None
 
     def _interpret(self, d: bytes) -> bool:
         if len(d) < 17: return False
@@ -107,8 +108,6 @@ class EBC:
             self.curr.state = 'active'
         elif id < 30:
             self.curr.state = 'done'
-            self.logger.info("DONE!")
-            self.done = True
         if id in (2, 12, 22):
             self.curr.mode = ChargeMode.ccv
         elif id in (0, 10, 20):
@@ -162,6 +161,10 @@ class EBC:
                 datagram += b
             logger.info(" ".join('{:02x}'.format(b) for b in datagram))
             self._interpret(datagram)
+            if self.condition is not None:
+                if self.condition(datagram):
+                    self.logger.info("DONE!")
+                    self.done = True
 
     def connect(self) -> None:
         # fa 05 00 00 00 00 00 00 05 f8
@@ -180,10 +183,25 @@ class EBC:
 
     def measure_r(self, i:int) -> int:
         # fa 09 00 64 00 00 00 00 6d f8
+        state = 0
+        r = 0
+        def checker(d: bytes) -> bool:
+            global state
+            global r
+            id = int(d[0])
+            if id == 2:
+                if state == 0:  # 1st -> pre
+                    pass
+                elif state == 1:
+                    r = self.curr.q / i
+                elif state == 2:
+                    self.done = True
+                state += 1
+
         self.begin = self.gettimestamp()
-        self.send([9] + self._i2td(i) + [0,0,0,0])
-        self.wait()
-        return self.curr.q / i
+        self.send([9] + self._i2td(i) + [0, 0, 0, 0])
+        self.wait(checker)
+        return r
 
     def send(self, data: Iterable[int]) -> None:
         d = list(data)
@@ -235,13 +253,17 @@ class EBC:
             data = [1] + self._i2td(i) + self._i2td(u) + self._i2d(0)
             self.send(data)
         self.keepalive.start()
+        self.condition = lambda d: 20 <= int(d[0]) <= 22 or 0 <= int(d[0]) <= 2
 
-    def wait(self):
+    def wait(self, condition: Callable[[bytes], bool] = None) -> None:
+        if condition is not None:
+            self.condition = condition
         while True:
             time.sleep(5)
             if self.done:
                 break
         end = self.gettimestamp()
+        self.condition = None
         logging.debug("Start at: " + end.strftime('%X'))
         logging.debug("Duration: " + str(end - self.begin))
 
