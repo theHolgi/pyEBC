@@ -186,17 +186,16 @@ class EBC:
         state = 0
         r = 0
         def checker(d: bytes) -> bool:
-            global state
-            global r
-            id = int(d[0])
-            if id == 2:
-                if state == 0:  # 1st -> pre
-                    pass
-                elif state == 1:
-                    r = self.curr.q / i
-                elif state == 2:
-                    self.done = True
-                state += 1
+            nonlocal state
+            nonlocal r
+            # id = int(d[0])
+            if state == 0:  # 1st -> pre
+                pass
+            elif state == 1:
+                r = (self.curr.q * 1000) / i
+            elif state == 2:
+                self.done = True
+            state += 1
 
         self.begin = self.gettimestamp()
         self.send([9] + self._i2td(i) + [0, 0, 0, 0])
@@ -234,6 +233,7 @@ class EBC:
         # fa 21 02 14 01 78 00 32 7c f8
         self.done = False
         self.begin = self.gettimestamp()
+        self.curr.state = "init"
         logging.debug("Start at: " + self.begin.strftime('%X'))
         if mode == ChargeMode.ccv:
             if i is None or u is None or istop is None:
