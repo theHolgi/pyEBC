@@ -105,7 +105,7 @@ class EBC:
             self.curr.state = 'idle'
         elif id < 20:
             self.curr.state = 'active'
-        else:
+        elif id < 30:
             self.curr.state = 'done'
             self.logger.info("DONE!")
             self.done = True
@@ -118,12 +118,13 @@ class EBC:
 
         self.curr.q = self._d2i(d[5:7])  # mAh
         self.curr.x1 = self._d2i(d[7:9])  # ?
-        if self.curr.mode in [ChargeMode.ccv, ChargeMode.dcc]:
-            self.curr.i_s = self._d2ti(d[9:11])  # soll mA
-        elif self.curr.mode == ChargeMode.dcp:
-            self.curr.p_s = self._d2i(d[9:11])     # soll P (W)
-        self.curr.u_s = self._d2ti(d[11:13]) # soll mV
-        self.curr.x2 = self._d2i(d[13:15])   # ?
+        if id < 30:  # Ignore high messages with unknown upper payload
+            if self.curr.mode in [ChargeMode.ccv, ChargeMode.dcc]:
+                self.curr.i_s = self._d2ti(d[9:11])  # soll mA
+            elif self.curr.mode == ChargeMode.dcp:
+                self.curr.p_s = self._d2i(d[9:11])     # soll P (W)
+            self.curr.u_s = self._d2ti(d[11:13]) # soll mV
+            self.curr.x2 = self._d2i(d[13:15])   # ?
         self.curr.model = self.models[int(d[15])]
 
         if self.last_rx is None:
