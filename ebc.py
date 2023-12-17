@@ -64,13 +64,17 @@ class StateChecker:
 class RTestChecker(StateChecker):
     r = 0
 
+    def __init__(self, i: int):
+        super().__init__()
+        self.i = i
+        
     def check(self, d: bytes) -> bool:
         # id = int(d[0])
         if self.state == 0:  # 1st -> pre
             pass
         elif self.state == 1:
-            i, u = EBC._d2i(d[1:3]), EBC._d2i(d[5:7])
-            self.r = (u * 1000) / i
+            du = EBC._d2i(d[5:7])
+            self.r = (du * 1000) / self.i
         elif self.state == 2:
             return True
         self.state += 1
@@ -116,13 +120,14 @@ class EBC_Keepalive:
     def __init__(self, send_func):
         self.send_func = send_func
         self.pause = Event()
-        self.keepalivetask = Thread(target=self.keepalive_func, daemon=True)
+        self.stop()
         self.hbcnt = 0
+        self.keepalivetask = Thread(target=self.keepalive_func, daemon=True)
+        self.keepalivetask.start()
 
     def start(self) -> None:
         self.hbcnt = 0
         self.pause.clear()
-        self.keepalivetask.start()
 
     def stop(self) -> None:
         self.pause.set()
@@ -154,19 +159,17 @@ class EBC:
         self.condition = None
         self.handler = None
         self.is_connected = False
-        signal.signal(signal.SIGINT, self.break_handler)
-        signal.signal(signal.SIGTERM, self.break_handler)
+        def break_handler(signum, frame):
+           self.stop()
+           self.disconnect()
+        signal.signal(signal.SIGINT, break_handler)
+        signal.signal(signal.SIGTERM, break_handler)
 
     def set_eventhandler(self, cb = Callable[[EbcStatus], None]):
         self.handler = cb
 
     def set_checker(self, c: StateChecker) -> None:
         self.condition = c
-
-    def break_handler(self):
-        """Handles to "Break" OS signal"""
-        self.stop()
-        self.disconnect()
 
     def _interpret(self, d: bytes) -> bool:
         if len(d) < 17: return False
@@ -259,7 +262,7 @@ class EBC:
         # fa 09 00 64 00 00 00 00 6d f8
         self.begin = self.gettimestamp()
         self.send([9] + self._i2td(i) + [0, 0, 0, 0])
-        self.set_checker(RTestChecker())
+        self.set_checker(RTestChecker(i))
         self.wait()
         return self.condition.result()
 
