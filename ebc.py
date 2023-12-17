@@ -62,13 +62,17 @@ class StateChecker:
 class RTestChecker(StateChecker):
     r = 0
 
+    def __init__(self, i: int):
+        super().__init__()
+        self.i = i
+        
     def check(self, d: bytes) -> bool:
         # id = int(d[0])
         if self.state == 0:  # 1st -> pre
             pass
         elif self.state == 1:
-            i, u = EBC._d2i(d[1:3]), EBC._d2i(d[5:7])
-            self.r = (u * 1000) / i
+            du = EBC._d2i(d[5:7])
+            self.r = (du * 1000) / self.i
         elif self.state == 2:
             return True
         self.state += 1
@@ -114,8 +118,10 @@ class EBC_Keepalive:
     def __init__(self, send_func):
         self.send_func = send_func
         self.pause = Event()
-        self.keepalivetask = Thread(target=self.keepalive_func, daemon=True)
+        self.stop()
         self.hbcnt = 0
+        self.keepalivetask = Thread(target=self.keepalive_func, daemon=True)
+        self.keepalivetask.start()
 
     def start(self) -> None:
         self.hbcnt = 0
@@ -249,7 +255,7 @@ class EBC:
         # fa 09 00 64 00 00 00 00 6d f8
         self.begin = self.gettimestamp()
         self.send([9] + self._i2td(i) + [0, 0, 0, 0])
-        self.set_checker(RTestChecker())
+        self.set_checker(RTestChecker(i))
         self.wait()
         return self.condition.result()
 
@@ -288,7 +294,7 @@ class EBC:
         if mode == ChargeMode.ccv:
             if i is None or u is None or istop is None:
                 raise ValueError("Required parameters for CCV charge; U, I, ISTOP")
-            data = [33] + self._i2d(i) + self._i2td(u) + self._i2td(istop)
+            data = [33] + self._i2td(i) + self._i2td(u) + self._i2td(istop)
             self.send(data)
         if mode == ChargeMode.dcp:
             if p is None and i is not None:
