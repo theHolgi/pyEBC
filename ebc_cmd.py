@@ -15,7 +15,6 @@ def ccv(e, args):
 
 def status(e, args):
    time.sleep(10)
-   e.disconnect()
 
 def meas_r(e, args):
    r = e.measure_r(args.i)
@@ -46,3 +45,5 @@ if __name__ == '__main__':
    e = EBC(args.port)
    e.connect()
    args.func(e, args)
+   e.stop()
+   e.disconnect()

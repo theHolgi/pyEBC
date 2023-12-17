@@ -1,8 +1,7 @@
-# This is a sample Python script.
+#!/usr/bin/env python3
 import re
 import time
 from datetime import datetime
-from types import SimpleNamespace
 from typing import List, Tuple, Iterable, Union, Callable
 
 import serial
@@ -53,6 +52,63 @@ class Stdoutwriter:
     def gettimestamp(self) -> datetime:
         return self.timestamp
 
+class StateChecker:
+    def __init__(self):
+        self.state = 0
+
+    def check(self, d: bytes) -> bool:
+        ...
+
+class RTestChecker(StateChecker):
+    r = 0
+
+    def check(self, d: bytes) -> bool:
+        # id = int(d[0])
+        if self.state == 0:  # 1st -> pre
+            pass
+        elif self.state == 1:
+            i, u = EBC._d2i(d[1:3]), EBC._d2i(d[5:7])
+            self.r = (u * 1000) / i
+        elif self.state == 2:
+            return True
+        self.state += 1
+        return False
+
+    def result(self) -> float:
+        return self.r
+
+
+class ChargeChecker(StateChecker):
+    def check(self, d: bytes) -> bool:
+        if self.state == 0:
+            if not (20 <= int(d[0]) <= 22 or 0 <= int(d[0]) <= 2):
+                self.state += 1
+            return False
+        else:
+            return 20 <= int(d[0]) <= 22 or 0 <= int(d[0]) <= 2
+
+
+class EbcStatus:
+    def __init__(self):
+       self.u = 0
+       self.i = 0
+       self.q = 0
+       self.p = 0
+       self.u_s = 0
+       self.i_s = 0
+       self.p_s = 0
+
+    def update_ist(self, u: int, i: int, q: int) -> None:
+       self.u = u
+       self.i = i
+       self.q = q
+       self.p = self.i * self.u / 1000
+
+    def update_target(self, u: int, i: int=None, p: int=None) -> None:
+       self.u_s = u
+       self.i_s = i
+       self.p_s = p
+
 
 class EBC_Keepalive:
     def __init__(self, send_func):
@@ -88,20 +144,26 @@ class EBC:
             self.gettimestamp = datetime.now
         self.keepalive = EBC_Keepalive(self.send)
         self.readertask = Thread(target=self.read_func, daemon=True)
-        self.curr = SimpleNamespace()
+        self.curr = EbcStatus()
         self.done = True
         self.last_rx = None
         self.logger = logging.getLogger(self.__class__.__name__)
         self.condition = None
+        self.handler = None
+        self.is_connected = False
+
+    def set_eventhandler(self, cb = Callable[[EbcStatus], None]):
+        self.handler = cb
+
+    def set_checker(self, c: StateChecker) -> None:
+        self.condition = c
 
     def _interpret(self, d: bytes) -> bool:
         if len(d) < 17: return False
         now = self.gettimestamp()
         id = int(d[0])
         # First part of message is always the same
-        self.curr.i = self._d2ti(d[1:3])     # mA
-        self.curr.u = self._d2i(d[3:5])      # mV
-        self.curr.p = self.curr.i * self.curr.u / 1000
+        self.curr.update_ist(i=self._d2ti(d[1:3]), u=self._d2i(d[3:5]), q=self._d2i(d[5:7]))  # mA, mV, mAh
         if id < 10:
             self.curr.state = 'idle'
         elif id < 20:
@@ -115,14 +177,12 @@ class EBC:
         elif id in (1, 11, 21):
             self.curr.mode = ChargeMode.dcp
 
-        self.curr.q = self._d2i(d[5:7])  # mAh
         self.curr.x1 = self._d2i(d[7:9])  # ?
         if id < 30:  # Ignore high messages with unknown upper payload
             if self.curr.mode in [ChargeMode.ccv, ChargeMode.dcc]:
-                self.curr.i_s = self._d2ti(d[9:11])  # soll mA
+                self.curr.update_target(u=self._d2ti(d[11:13]), i=self._d2ti(d[9:11]))  # soll mV, mA
             elif self.curr.mode == ChargeMode.dcp:
-                self.curr.p_s = self._d2i(d[9:11])     # soll P (W)
-            self.curr.u_s = self._d2ti(d[11:13]) # soll mV
+                self.curr.update_target(u=self._d2ti(d[11:13]), p=self._d2i(d[9:11]))     # soll mV, W
             self.curr.x2 = self._d2i(d[13:15])   # ?
         self.curr.model = self.models[int(d[15])]
 
@@ -134,6 +194,8 @@ class EBC:
             self.curr.qw += dQ
         self.last_rx = now
         self.dumpState()
+        if self.handler is not None:
+            self.handler(self.curr)
         return True
 
     def dumpState(self) -> None:
@@ -162,7 +224,7 @@ class EBC:
             logger.info(" ".join('{:02x}'.format(b) for b in datagram))
             self._interpret(datagram)
             if self.condition is not None:
-                if self.condition(datagram):
+                if self.condition.check(datagram):
                     self.logger.info("DONE!")
                     self.done = True
 
@@ -170,10 +232,12 @@ class EBC:
         # fa 05 00 00 00 00 00 00 05 f8
         self.send((5,0,0,0,0,0,0))
         self.readertask.start()
+        self.is_connected = True
 
     def disconnect(self) -> None:
         # fa 05 00 00 00 00 00 00 05 f8
         self.send((6,0,0,0,0,0,0))
+        self.is_connected = False
 
     def stop(self) -> None:
         # fa 05 00 00 00 00 00 00 05 f8
@@ -183,24 +247,11 @@ class EBC:
 
     def measure_r(self, i:int) -> int:
         # fa 09 00 64 00 00 00 00 6d f8
-        state = 0
-        r = 0
-        def checker(d: bytes) -> bool:
-            nonlocal state
-            nonlocal r
-            # id = int(d[0])
-            if state == 0:  # 1st -> pre
-                pass
-            elif state == 1:
-                r = (self.curr.q * 1000) / i
-            elif state == 2:
-                self.done = True
-            state += 1
-
         self.begin = self.gettimestamp()
         self.send([9] + self._i2td(i) + [0, 0, 0, 0])
-        self.wait(checker)
-        return r
+        self.set_checker(RTestChecker())
+        self.wait()
+        return self.condition.result()
 
     def send(self, data: Iterable[int]) -> None:
         d = list(data)
@@ -213,7 +264,6 @@ class EBC:
     @staticmethod
     def _i2d(n: int) -> List[int]:
         """Convert value to data"""
-        n = n
         return [n // 240, n % 240]
 
     @staticmethod
@@ -253,17 +303,15 @@ class EBC:
             data = [1] + self._i2td(i) + self._i2td(u) + self._i2d(0)
             self.send(data)
         self.keepalive.start()
-        self.condition = lambda d: 20 <= int(d[0]) <= 22 or 0 <= int(d[0]) <= 2
+        self.set_checker(ChargeChecker())
 
-    def wait(self, condition: Callable[[bytes], bool] = None) -> None:
-        if condition is not None:
-            self.condition = condition
+    def wait(self) -> None:
+        self.done = False
         while True:
             time.sleep(5)
             if self.done:
                 break
         end = self.gettimestamp()
-        self.condition = None
         logging.debug("Start at: " + end.strftime('%X'))
         logging.debug("Duration: " + str(end - self.begin))
 
