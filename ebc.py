@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import re
+import signal
 import time
 from datetime import datetime
 from typing import List, Tuple, Iterable, Union, Callable
@@ -9,6 +10,7 @@ from functools import reduce
 from enum import Enum
 from threading import Thread, Event
 import logging
+import signal
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -120,6 +122,7 @@ class EBC_Keepalive:
     def start(self) -> None:
         self.hbcnt = 0
         self.pause.clear()
+        self.keepalivetask.start()
 
     def stop(self) -> None:
         self.pause.set()
@@ -151,12 +154,19 @@ class EBC:
         self.condition = None
         self.handler = None
         self.is_connected = False
+        signal.signal(signal.SIGINT, self.break_handler)
+        signal.signal(signal.SIGTERM, self.break_handler)
 
     def set_eventhandler(self, cb = Callable[[EbcStatus], None]):
         self.handler = cb
 
     def set_checker(self, c: StateChecker) -> None:
         self.condition = c
+
+    def break_handler(self):
+        """Handles to "Break" OS signal"""
+        self.stop()
+        self.disconnect()
 
     def _interpret(self, d: bytes) -> bool:
         if len(d) < 17: return False
@@ -288,7 +298,7 @@ class EBC:
         if mode == ChargeMode.ccv:
             if i is None or u is None or istop is None:
                 raise ValueError("Required parameters for CCV charge; U, I, ISTOP")
-            data = [33] + self._i2d(i) + self._i2td(u) + self._i2td(istop)
+            data = [33] + self._i2td(i) + self._i2td(u) + self._i2td(istop)
             self.send(data)
         if mode == ChargeMode.dcp:
             if p is None and i is not None:

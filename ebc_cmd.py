@@ -13,6 +13,14 @@ def ccv(e, args):
    e.charge(ChargeMode.ccv, u=args.u, i=args.i, istop=args.cut)
    e.wait()
 
+def dcc(e, args):
+   e.charge(ChargeMode.dcc, u=args.u, i=args.i, istop=args.cut)
+   e.wait()
+
+def dcp(e, args):
+   e.charge(ChargeMode.dcp, u=args.u, p=args.p)
+   e.wait()
+
 def status(e, args):
    time.sleep(10)
 
@@ -26,12 +34,27 @@ if __name__ == '__main__':
    arg = ArgumentParser(prog='EBC')
    arg.add_argument('--port', '-p', required=False, default='/dev/ttyUSB0')
    subparsers = arg.add_subparsers(dest='cmd')
-   parser_ccv = subparsers.add_parser('ccv', help="Charge CV help")
+
+   parser_ccv = subparsers.add_parser('ccv', help="Charge constant voltage")
    parser_ccv.add_argument('u', help="Target voltage (mV)", type=int)
    parser_ccv.add_argument('i', help="Target current (mA)", type=int)
    parser_ccv.add_argument('cut', help="Cut-off current (mA)", type=int)
    parser_ccv.add_argument('to', nargs='?', help="Timeout (minutes)", type=int)
    parser_ccv.set_defaults(func=ccv)
+
+   parser_dcc = subparsers.add_parser('dcc', help="Discharge Constant current")
+   parser_dcc.add_argument('u', help="Target voltage (mV)", type=int)
+   parser_dcc.add_argument('i', help="Target current (mA)", type=int)
+   parser_dcc.add_argument('cut', help="Cut-off current (mA)", type=int)
+   parser_dcc.add_argument('to', nargs='?', help="Timeout (minutes)", type=int)
+   parser_dcc.set_defaults(func=dcc)
+
+   parser_dcp = subparsers.add_parser('dcp', help="Discharge Constant Power")
+   parser_dcp.add_argument('u', help="Target voltage (mV)", type=int)
+   parser_dcp.add_argument('p', help="Target current (W)", type=int)
+   parser_dcp.add_argument('to', nargs='?', help="Timeout (minutes)", type=int)
+   parser_dcp.set_defaults(func=dcp)
+
    parser_disconnect = subparsers.add_parser('disconnect', help="Disconnect")
    parser_disconnect.set_defaults(func=disconnect)
    parser_stop = subparsers.add_parser('stop', help="Stop")
